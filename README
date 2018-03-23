@@ -1,0 +1,111 @@
+This project was an attempt to use my desktop to render sections of the 
+Mandelbrot set of complex numbers, and display those images on my phone.
+
+        Mandelbrot Set Overview:
+
+The mandelbrot set of complex numbers is an iterative fractial. Any starting
+Z_0 in the complex numbers generates a chain:
+
+Z_i+1 = Z_i^2 + Z_0
+
+And a color is assigned based off the number of iterations it takes to make this
+chain diverge. I used the metric |Z_i| > 2 means divergence.
+
+        Target Platforms:
+
+Ubuntu 16.04
+Android 8.0
+
+        Technologies Used:
+
+Nodejs
+libpng
+nvcc (cuda)
+Android Studio
+
+
+        SERVER OVERVIEW:
+
+On my computer, a nodejs instance starts on boot from IP 192.186.1.126. There, a
+GPU enabled program was maintained as a child process. The node server can pipe
+a requested section into the process, and a raw png would be piped out. The 
+server operated as a stack rather than a queue, so that the GPU would always 
+work on the most relevent sections of the Mandelbrot Set.
+
+I learned a great deal about optimization and pipelining to achieve this goal
+
+The protocol for specifiying a section of the mandelbrot set is determined by 
+recursive expansion on a 3x3 tree of double precision floats. 
+
+at the root of the tree is m which is bounded by [-2, 2] and [-2i, 2i]
+Then the root is divided into 9 sub-images, and each of those 9 sub images are
+further divided as seen in square m8
+
+       ---------------------------------
+      |          |           |          |
+      |          |           |          |
+      |    m1    |    m2     |    m3    |
+      |          |           |          |
+      |          |           |          |
+      |----------+-----------+----------|
+      |          |           |          |
+      |          |           |          |
+      |    m4    |    m5     |    m6    |
+      |          |           |          |
+      |          |           |          |
+      |----------+-----------+----------|
+      |          |m81|m82|m83|          |
+      |          |---+---+---|          |
+      |    m7    |m84|m85|m86|    m9    |
+      |          |---+---+---|          |
+      |          |m87|m88|m89|          |
+       ---------------------------------
+
+I recognize that a 4x4 tree would make more sense from a computational roundoff
+perspective, yet 3x3 had a nice balance between resolution and bandwith when it
+came to pre-loading images from the android application.
+
+
+
+
+        APPLICATION OVERVIEW:
+
+The android application was a single SurfaceView, a class to convert touch 
+events into a set of window boundries, and a tree of mandelbrot sections that 
+represent images that could be loaded from the server.
+
+As the user pans and zooms, the application resolves the relevent areas to 
+render. If the png had already been downloaded, it would display on the screen.
+Otherwise it would be requested for download from the node server.
+
+In order to do this, the actual window boundries needed to be converted to a set
+of relevent sections of the form "m64", "m61", "m5", "m6", "m56"...
+This was done via a depth first search on the tree with the window coordinates.
+
+Priority was given to the images closest to the smooth depth of the user's 
+screen, and with the most overlap. The smooth depth was determined by
+
+             | viewWidth * initialScale  |
+depth = log_3| ------------------------- | 
+             | imageWidth * currentScale |
+
+The application had to free images that the user panned away from because memory
+is scarce on the mobile platform.
+
+
+
+
+        RESULTS:
+
+The application was rather smooth and fast. Tiling worked great and I am very 
+happy with the result. It could be faster if I had a better graphics card
+(I am using a GT710), but I am not certain that it is faster than the device
+could render on it's own. Also, the memory usage was very high.
+
+I never got zoom velocity to work properly, so once the user lifted up their 
+finger the scrolling and zooming would stop immediately. I was disappointed 
+about this because my goal was "google maps" scrolling for the mandelbrot set.
+
+It was largely successful, except the speed benefits of the desktop GPU did not
+outweigh the cost of png compression and wifi latency.
+
